@@ -1,5 +1,5 @@
 const { GoogleGenAI } = require('@google/genai')
-const pdfParse = require('pdf-parse')
+const { PDFParse } = require('pdf-parse')
 const supabase = require('../supabaseClient')
 
 const cleanQuestionText = (text) => {
@@ -140,9 +140,14 @@ const generateQuestion = async (req, res) => {
 const evaluateAnswer = async (req, res) => {
 	try {
 		const { answer, question } = req.body
+		const userId = req.user?.id
 
 		if (!answer) {
 			return res.status(400).json({ error: 'Answer is required' })
+		}
+
+		if (!userId) {
+			return res.status(401).json({ error: 'Unauthorized' })
 		}
 
 		const apiKey = process.env.GEMINI_API_KEY
@@ -206,6 +211,7 @@ Give response in JSON format with:
 			// Save evaluation to Supabase
 			const { error } = await supabase.from('interview_sessions').insert([
 				{
+					user_id: userId,
 					question: question || null,
 					answer: answer,
 					score: score,
@@ -255,6 +261,11 @@ const handleResumeUpload = async (req, res) => {
 	let resumeTextForSave = null
 
 	try {
+		const userId = req.user?.id
+		if (!userId) {
+			return res.status(401).json({ error: 'Unauthorized' })
+		}
+
 		const apiKey = process.env.GEMINI_API_KEY
 		if (!apiKey) {
 			return res.status(500).json({ error: 'API key not configured' })
@@ -272,7 +283,9 @@ Return JSON array only.`
 				return res.status(400).json({ error: 'Invalid resume file' })
 			}
 
-			const parsedPdf = await pdfParse(req.file.buffer)
+			const parser = new PDFParse({ data: req.file.buffer })
+			const parsedPdf = await parser.getText()
+			await parser.destroy()
 			const resumeText = (parsedPdf.text || '').trim().slice(0, 2000)
 
 			if (!resumeText) {
@@ -323,6 +336,7 @@ ${resumeText}`
 
 		const { error: saveError } = await supabase.from('interview_sessions').insert([
 			{
+				user_id: userId,
 				question: typeof questions[0] === 'string' ? questions[0] : null,
 				mode,
 				resume_text: resumeTextForSave,
@@ -344,6 +358,7 @@ ${resumeText}`
 
 		const { error: fallbackSaveError } = await supabase.from('interview_sessions').insert([
 			{
+				user_id: req.user?.id || null,
 				question: null,
 				mode,
 				resume_text: resumeTextForSave,
@@ -372,9 +387,15 @@ ${resumeText}`
 
 const getSessions = async (req, res) => {
 	try {
+		const userId = req.user?.id
+		if (!userId) {
+			return res.status(401).json({ error: 'Unauthorized' })
+		}
+
 		const { data, error } = await supabase
 			.from('interview_sessions')
 			.select('*')
+			.eq('user_id', userId)
 			.order('created_at', { ascending: false })
 
 		if (error) {
@@ -391,10 +412,48 @@ const getSessions = async (req, res) => {
 
 const getInterviewSessions = getSessions
 
+const deleteSession = async (req, res) => {
+	try {
+		const { id } = req.params
+		const sessionId = (id || '').trim()
+		const userId = req.user?.id
+
+		if (!sessionId) {
+			return res.status(400).json({ error: 'Invalid session id' })
+		}
+
+		if (!userId) {
+			return res.status(401).json({ error: 'Unauthorized' })
+		}
+
+		const { data, error } = await supabase
+			.from('interview_sessions')
+			.delete()
+			.eq('id', sessionId)
+			.eq('user_id', userId)
+			.select('id')
+
+		if (error) {
+			console.error('Error deleting session:', error.message)
+			return res.status(500).json({ error: 'Failed to delete session' })
+		}
+
+		if (!Array.isArray(data) || data.length === 0) {
+			return res.status(404).json({ error: 'Session not found' })
+		}
+
+		return res.json({ success: true, id: sessionId })
+	} catch (error) {
+		console.error('Error deleting session:', error.message)
+		return res.status(500).json({ error: 'Failed to delete session' })
+	}
+}
+
 module.exports = {
 	generateQuestion,
 	evaluateAnswer,
 	handleResumeUpload,
 	getSessions,
+	deleteSession,
 	getInterviewSessions,
 }

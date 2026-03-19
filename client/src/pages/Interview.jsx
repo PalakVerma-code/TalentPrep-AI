@@ -4,8 +4,10 @@ import QuestionBox from '../components/QuestionBox'
 import AnswerInput from '../components/AnswerInput'
 import EvaluationResult from '../components/EvaluationResult'
 import StartButton from '../components/StartButton'
+import { apiFetch } from '../lib/api'
+import UserMenu from '../components/UserMenu'
 
-export default function Interview() {
+export default function Interview({ user }) {
 	const navigate = useNavigate()
 	const [questions, setQuestions] = useState([])
 	const [currentIndex, setCurrentIndex] = useState(0)
@@ -20,10 +22,14 @@ export default function Interview() {
 
 	const fetchGeneralQuestions = async () => {
 		try {
-			const response = await fetch('http://localhost:5000/api/interview/upload-resume', {
+			const { response, data } = await apiFetch('/api/interview/upload-resume', {
 				method: 'POST',
 			})
-			const data = await response.json()
+
+			if (response.status === 401) {
+				navigate('/auth', { replace: true })
+				return
+			}
 
 			if (!response.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
 				setUploadMessage(data.error || 'Could not load questions. Please try again.')
@@ -41,13 +47,15 @@ export default function Interview() {
 
 	const evaluateAnswer = async (submittedAnswer, askedQuestion) => {
 		try {
-			const response = await fetch('http://localhost:5000/api/interview/evaluate-answer', {
+			const { response, data } = await apiFetch('/api/interview/evaluate-answer', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ question: askedQuestion, answer: submittedAnswer }),
 			})
 
-			const data = await response.json()
+			if (response.status === 401) {
+				navigate('/auth', { replace: true })
+				return
+			}
 
 			if (!response.ok || !data.score) {
 				setEvaluation({ error: data.error || 'Failed to evaluate answer' })
@@ -116,12 +124,15 @@ export default function Interview() {
 			setIsUploading(true)
 			setUploadMessage('Uploading resume and generating questions...')
 
-			const response = await fetch('http://localhost:5000/api/interview/upload-resume', {
+			const { response, data } = await apiFetch('/api/interview/upload-resume', {
 				method: 'POST',
 				body: formData,
 			})
 
-			const data = await response.json()
+			if (response.status === 401) {
+				navigate('/auth', { replace: true })
+				return
+			}
 
 			if (!response.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
 				setUploadMessage(data.error || 'Could not generate questions from resume.')
@@ -151,6 +162,10 @@ export default function Interview() {
 
 	return (
 		<main className="flex min-h-screen flex-col bg-slate-50 px-4 py-8">
+			<div className="mx-auto mb-4 flex w-full max-w-7xl justify-end">
+				<UserMenu user={user} />
+			</div>
+
 			<div className="mx-auto mb-6 flex w-full max-w-7xl flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4">
 				<label className="text-sm font-medium text-slate-700" htmlFor="resume-upload">
 					Upload Resume (PDF)
@@ -202,7 +217,10 @@ export default function Interview() {
 
 			{/* Back Button - Below layout on all screen sizes */}
 			<div className="mx-auto mt-8 w-full max-w-7xl">
-				<StartButton label="Back to Home" onClick={() => navigate('/')} />
+				<div className="flex flex-wrap gap-3">
+					<StartButton label="Back to Home" onClick={() => navigate('/')} />
+					<StartButton label="Go to Dashboard" onClick={() => navigate('/dashboard')} />
+				</div>
 			</div>
 		</main>
 	)

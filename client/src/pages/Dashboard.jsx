@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StartButton from '../components/StartButton'
+import { apiFetch } from '../lib/api'
+import UserMenu from '../components/UserMenu'
 
 const formatDate = (dateString) => {
 	if (!dateString) {
@@ -22,11 +24,12 @@ const shortenFeedback = (feedback) => {
 	return `${feedback.slice(0, 120)}...`
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user }) {
 	const navigate = useNavigate()
 	const [sessions, setSessions] = useState([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState('')
+	const [deletingSessionId, setDeletingSessionId] = useState(null)
 
 	const validScores = sessions
 		.map((session) => Number(session.score))
@@ -43,8 +46,12 @@ export default function Dashboard() {
 				setIsLoading(true)
 				setError('')
 
-				const response = await fetch('http://localhost:5000/api/interview/get-sessions')
-				const data = await response.json()
+				const { response, data } = await apiFetch('/api/interview/get-sessions')
+
+				if (response.status === 401) {
+					navigate('/auth', { replace: true })
+					return
+				}
 
 				if (!response.ok) {
 					setError(data.error || 'Could not load sessions.')
@@ -64,12 +71,42 @@ export default function Dashboard() {
 		fetchSessions()
 	}, [])
 
+	const handleDeleteSession = async (sessionId) => {
+		try {
+			setDeletingSessionId(sessionId)
+			setError('')
+
+			const { response, data } = await apiFetch(`/api/interview/sessions/${sessionId}`, {
+				method: 'DELETE',
+			})
+
+			if (response.status === 401) {
+				navigate('/auth', { replace: true })
+				return
+			}
+
+			if (!response.ok) {
+				setError(data.error || 'Could not delete this session.')
+				return
+			}
+
+			setSessions((prevSessions) => prevSessions.filter((session) => session.id !== sessionId))
+		} catch (deleteError) {
+			setError('Could not delete this session. Please try again.')
+		} finally {
+			setDeletingSessionId(null)
+		}
+	}
+
 	return (
 		<main className="min-h-screen bg-slate-50 px-4 py-8">
 			<div className="mx-auto w-full max-w-5xl">
 				<div className="mb-6 flex flex-wrap items-center justify-between gap-3">
 					<h1 className="text-3xl font-bold text-slate-900">Interview Dashboard</h1>
-					<StartButton label="Back" onClick={() => navigate('/')} />
+					<div className="flex flex-wrap items-center gap-3">
+						<StartButton label="Back" onClick={() => navigate('/')} />
+						<UserMenu user={user} />
+					</div>
 				</div>
 
 				{!isLoading && !error && sessions.length > 0 && (
@@ -104,6 +141,14 @@ export default function Dashboard() {
 
 								<h2 className="mb-2 text-base font-semibold text-slate-900">{session.question || 'No question'}</h2>
 								<p className="text-sm text-slate-600">{shortenFeedback(session.feedback)}</p>
+								<button
+									type="button"
+									onClick={() => handleDeleteSession(session.id)}
+									disabled={deletingSessionId === session.id}
+									className="mt-4 inline-flex rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+								>
+									{deletingSessionId === session.id ? 'Deleting...' : 'Delete'}
+								</button>
 							</article>
 						))}
 					</div>
