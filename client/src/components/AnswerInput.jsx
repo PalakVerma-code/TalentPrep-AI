@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import StartButton from './StartButton'
 
-export default function AnswerInput({ answer, onAnswerChange, onSubmit }) {
-	const canSubmit = answer.trim().length > 0
+export default function AnswerInput({ answer, onAnswerChange, onSubmit, isEvaluating = false }) {
+	const canSubmit = answer.trim().length > 0 && !isEvaluating
 	const [isListening, setIsListening] = useState(false)
 	const [speechError, setSpeechError] = useState('')
 	const recognitionRef = useRef(null)
@@ -65,13 +65,14 @@ export default function AnswerInput({ answer, onAnswerChange, onSubmit }) {
 	}, [])
 
 	return (
-		<form onSubmit={onSubmit} className="mt-4 w-full max-w-xl space-y-3">
+		<form onSubmit={onSubmit} className="mt-1 w-full max-w-xl space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+			<label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your Answer</label>
 			<textarea
 				value={answer}
 				onChange={(event) => onAnswerChange(event.target.value)}
 				placeholder="Type your answer here..."
 				rows={6}
-				className="w-full rounded-xl border border-slate-300 bg-white p-4 text-slate-800 outline-none ring-0 transition focus:border-slate-500"
+				className="w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-slate-800 outline-none ring-0 transition focus:border-blue-400 focus:bg-white"
 			/>
 			<div className="flex flex-wrap items-center gap-3">
 				<StartButton
@@ -80,7 +81,7 @@ export default function AnswerInput({ answer, onAnswerChange, onSubmit }) {
 					onClick={startListening}
 					disabled={isListening}
 				/>
-				<StartButton label="Submit Answer" type="submit" disabled={!canSubmit} />
+				<StartButton label="Submit Answer" type="submit" disabled={!canSubmit || isEvaluating} isLoading={isEvaluating} />
 			</div>
 			{speechError ? <p className="text-sm text-rose-600">{speechError}</p> : null}
 		</form>

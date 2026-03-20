@@ -42,22 +42,6 @@ const prepareQuestions = (items) => {
 	return deduped
 }
 
-const renderList = (items, emptyText) => {
-	const values = Array.isArray(items) ? items.filter(Boolean) : []
-
-	if (values.length === 0) {
-		return <p className="text-sm text-slate-500">{emptyText}</p>
-	}
-
-	return (
-		<ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
-			{values.map((item, index) => (
-				<li key={`${item}-${index}`}>{item}</li>
-			))}
-		</ul>
-	)
-}
-
 export default function Interview({ user }) {
 	const navigate = useNavigate()
 	const [questions, setQuestions] = useState([])
@@ -67,8 +51,8 @@ export default function Interview({ user }) {
 	const [resumeFile, setResumeFile] = useState(null)
 	const [isUploading, setIsUploading] = useState(false)
 	const [uploadMessage, setUploadMessage] = useState('')
-	const [latestReport, setLatestReport] = useState(null)
 	const [voiceMode, setVoiceMode] = useState(false)
+	const [isEvaluating, setIsEvaluating] = useState(false)
 	const hasFetchedInitialQuestion = useRef(false)
 	const currentQuestion =
 		questions[currentIndex] || 'No questions loaded. Upload resume or start without resume.'
@@ -104,6 +88,7 @@ export default function Interview({ user }) {
 
 	const evaluateAnswer = async (submittedAnswer, askedQuestion) => {
 		try {
+			setIsEvaluating(true)
 			const { response, data } = await apiFetch('/api/interview/evaluate-answer', {
 				method: 'POST',
 				body: JSON.stringify({ question: askedQuestion, answer: submittedAnswer }),
@@ -122,6 +107,8 @@ export default function Interview({ user }) {
 			setEvaluation(data)
 		} catch {
 			setEvaluation({ error: 'Failed to evaluate answer. Please try again.' })
+		} finally {
+			setIsEvaluating(false)
 		}
 	}
 
@@ -222,22 +209,6 @@ export default function Interview({ user }) {
 	}, [])
 
 	useEffect(() => {
-		try {
-			const savedReport = localStorage.getItem('skillGapReport')
-			if (!savedReport) {
-				return
-			}
-
-			const parsedReport = JSON.parse(savedReport)
-			if (parsedReport && typeof parsedReport === 'object') {
-				setLatestReport(parsedReport)
-			}
-		} catch (error) {
-			console.error('Failed to restore skill gap report:', error)
-		}
-	}, [])
-
-	useEffect(() => {
 		if (!voiceMode || !questions[currentIndex] || !window.speechSynthesis) {
 			return
 		}
@@ -267,40 +238,20 @@ export default function Interview({ user }) {
 	}, [])
 
 	return (
-		<main className="flex min-h-screen flex-col bg-slate-50 px-4 py-8">
-			<div className="mx-auto mb-4 flex w-full max-w-7xl justify-end">
-				<UserMenu user={user} />
+		<main className="min-h-screen bg-linear-to-b from-slate-100 via-slate-50 to-white px-4 py-8">
+			<div className="mx-auto mb-6 w-full max-w-7xl rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+				<div className="flex flex-wrap items-center justify-between gap-4">
+					<div>
+						<p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">AI Interview Coach</p>
+						<h1 className="mt-1 text-2xl font-bold text-slate-900">Interview Workspace</h1>
+						<p className="mt-1 text-sm text-slate-600">Practice, get feedback, and improve with a focused interview flow.</p>
+					</div>
+					<UserMenu user={user} />
+				</div>
 			</div>
 
-			<div className="mx-auto mb-6 flex w-full max-w-7xl flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4">
-				{latestReport ? (
-					<div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
-						<h3 className="mb-3 text-base font-semibold text-emerald-900">Latest Skill Gap Report</h3>
-						<div className="grid gap-3">
-							<section className="rounded-md bg-white p-3">
-								<p className="mb-1 text-sm font-semibold text-slate-700">Strengths</p>
-								{renderList(latestReport.strengths, 'No strengths identified yet.')}
-							</section>
-							<section className="rounded-md bg-white p-3">
-								<p className="mb-1 text-sm font-semibold text-slate-700">Weaknesses</p>
-								{renderList(latestReport.weaknesses, 'No weaknesses identified yet.')}
-							</section>
-							<section className="rounded-md bg-white p-3">
-								<p className="mb-1 text-sm font-semibold text-slate-700">Topics to Improve</p>
-								{renderList(latestReport.topics_to_improve, 'No topics to improve identified yet.')}
-							</section>
-							<section className="rounded-md bg-white p-3">
-								<p className="mb-1 text-sm font-semibold text-slate-700">Overall Summary</p>
-								<p className="text-sm text-slate-700">
-									{latestReport.overall_summary || latestReport.summary || 'No summary available yet.'}
-								</p>
-							</section>
-						</div>
-						<p className="mt-3 text-xs text-emerald-700">This report is synced from your Dashboard generation.</p>
-					</div>
-				) : null}
-
-				<div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+			<div className="mx-auto mb-6 flex w-full max-w-7xl flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+				<div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
 					<span className="text-sm font-medium text-slate-700">Voice Interview Mode</span>
 					<button
 						type="button"
@@ -326,12 +277,13 @@ export default function Interview({ user }) {
 					type="file"
 					accept="application/pdf"
 					onChange={handleFileChange}
-					className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+					className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400"
 				/>
 				<div className="flex flex-wrap items-center gap-3">
 					<StartButton
-						label={isUploading ? 'Uploading...' : 'Upload Resume'}
+						label="Upload Resume"
 						onClick={handleResumeUpload}
+						isLoading={isUploading}
 						disabled={isUploading}
 					/>
 					<span className="text-sm font-semibold text-slate-500">OR</span>
@@ -339,6 +291,7 @@ export default function Interview({ user }) {
 						label="Start Without Resume"
 						onClick={startWithoutResume}
 						disabled={isUploading}
+						isLoading={isUploading}
 					/>
 				</div>
 				{uploadMessage ? <p className="text-sm text-slate-600">{uploadMessage}</p> : null}
@@ -348,18 +301,18 @@ export default function Interview({ user }) {
 			<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 lg:flex-row lg:gap-8">
 				{/* LEFT COLUMN - Question and Answer Input */}
 				<div className="flex w-full flex-col gap-6 lg:w-1/2">
-					<h2 className="text-2xl font-bold text-slate-800">Interview Question</h2>
+					<h2 className="text-2xl font-bold text-slate-900">Interview Question</h2>
 					<QuestionBox question={currentQuestion} />
-					<AnswerInput answer={answer} onAnswerChange={setAnswer} onSubmit={handleSubmit} />
+					<AnswerInput answer={answer} onAnswerChange={setAnswer} onSubmit={handleSubmit} isEvaluating={isEvaluating} />
 				</div>
 
 				{/* RIGHT COLUMN - Evaluation Feedback */}
 				<div className="flex w-full flex-col gap-6 lg:w-1/2">
-					<h2 className="text-2xl font-bold text-slate-800">Feedback</h2>
+					<h2 className="text-2xl font-bold text-slate-900">Feedback</h2>
 					{evaluation ? (
 						<EvaluationResult evaluation={evaluation} />
 					) : (
-						<div className="rounded-lg border-2 border-dashed border-slate-300 bg-slate-100 p-6 text-center text-slate-500">
+						<div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 shadow-sm">
 							<p>Submit your answer to see feedback</p>
 						</div>
 					)}
