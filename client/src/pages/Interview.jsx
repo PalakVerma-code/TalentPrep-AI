@@ -7,6 +7,41 @@ import StartButton from '../components/StartButton'
 import { apiFetch } from '../lib/api'
 import UserMenu from '../components/UserMenu'
 
+const prepareQuestions = (items) => {
+	if (!Array.isArray(items)) {
+		return []
+	}
+
+	const deduped = []
+	const seen = new Set()
+
+	for (const item of items) {
+		if (typeof item !== 'string') {
+			continue
+		}
+
+		const cleaned = item.trim()
+		if (!cleaned) {
+			continue
+		}
+
+		const key = cleaned.toLowerCase()
+		if (seen.has(key)) {
+			continue
+		}
+
+		seen.add(key)
+		deduped.push(cleaned)
+	}
+
+	for (let index = deduped.length - 1; index > 0; index -= 1) {
+		const swapIndex = Math.floor(Math.random() * (index + 1))
+		;[deduped[index], deduped[swapIndex]] = [deduped[swapIndex], deduped[index]]
+	}
+
+	return deduped
+}
+
 export default function Interview({ user }) {
 	const navigate = useNavigate()
 	const [questions, setQuestions] = useState([])
@@ -16,6 +51,7 @@ export default function Interview({ user }) {
 	const [resumeFile, setResumeFile] = useState(null)
 	const [isUploading, setIsUploading] = useState(false)
 	const [uploadMessage, setUploadMessage] = useState('')
+	const [voiceMode, setVoiceMode] = useState(false)
 	const hasFetchedInitialQuestion = useRef(false)
 	const currentQuestion =
 		questions[currentIndex] || 'No questions loaded. Upload resume or start without resume.'
@@ -28,20 +64,24 @@ export default function Interview({ user }) {
 
 			if (response.status === 401) {
 				navigate('/auth', { replace: true })
-				return
+				return false
 			}
 
-			if (!response.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
+			const nextQuestions = prepareQuestions(data.questions)
+
+			if (!response.ok || nextQuestions.length === 0) {
 				setUploadMessage(data.error || 'Could not load questions. Please try again.')
 				setQuestions([])
-				return
+				return false
 			}
 
-			setQuestions(data.questions)
+			setQuestions(nextQuestions)
 			setCurrentIndex(0)
-		} catch (error) {
+			return true
+		} catch {
 			setUploadMessage('Could not load questions. Please try again.')
 			setQuestions([])
+			return false
 		}
 	}
 
@@ -63,7 +103,7 @@ export default function Interview({ user }) {
 			}
 
 			setEvaluation(data)
-		} catch (error) {
+		} catch {
 			setEvaluation({ error: 'Failed to evaluate answer. Please try again.' })
 		}
 	}
@@ -102,9 +142,11 @@ export default function Interview({ user }) {
 			setCurrentIndex(0)
 			setEvaluation(null)
 			setAnswer('')
-			await fetchGeneralQuestions()
-			setUploadMessage('Started without resume.')
-		} catch (error) {
+			const didLoad = await fetchGeneralQuestions()
+			if (didLoad) {
+				setUploadMessage('Started without resume.')
+			}
+		} catch {
 			setUploadMessage('Could not start interview. Please try again.')
 		} finally {
 			setIsUploading(false)
@@ -134,17 +176,19 @@ export default function Interview({ user }) {
 				return
 			}
 
-			if (!response.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
+			const nextQuestions = prepareQuestions(data.questions)
+
+			if (!response.ok || nextQuestions.length === 0) {
 				setUploadMessage(data.error || 'Could not generate questions from resume.')
 				return
 			}
 
-			setQuestions(data.questions)
+			setQuestions(nextQuestions)
 			setCurrentIndex(0)
 			setEvaluation(null)
 			setAnswer('')
 			setUploadMessage('Resume uploaded. Showing resume-based questions.')
-		} catch (error) {
+		} catch {
 			setUploadMessage('Upload failed. Please try again.')
 		} finally {
 			setIsUploading(false)
@@ -160,6 +204,35 @@ export default function Interview({ user }) {
 		setUploadMessage('Use Upload Resume or Start Without Resume to begin.')
 	}, [])
 
+	useEffect(() => {
+		if (!voiceMode || !questions[currentIndex] || !window.speechSynthesis) {
+			return
+		}
+
+		// Cancel prior speech so only the current question is spoken.
+		window.speechSynthesis.cancel()
+		const utterance = new SpeechSynthesisUtterance(questions[currentIndex])
+		utterance.lang = 'en-US'
+
+		try {
+			window.speechSynthesis.speak(utterance)
+		} catch (error) {
+			console.error('Speech synthesis error:', error)
+		}
+
+		return () => {
+			window.speechSynthesis.cancel()
+		}
+	}, [voiceMode, questions, currentIndex])
+
+	useEffect(() => {
+		return () => {
+			if (window.speechSynthesis) {
+				window.speechSynthesis.cancel()
+			}
+		}
+	}, [])
+
 	return (
 		<main className="flex min-h-screen flex-col bg-slate-50 px-4 py-8">
 			<div className="mx-auto mb-4 flex w-full max-w-7xl justify-end">
@@ -167,6 +240,24 @@ export default function Interview({ user }) {
 			</div>
 
 			<div className="mx-auto mb-6 flex w-full max-w-7xl flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4">
+				<div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+					<span className="text-sm font-medium text-slate-700">Voice Interview Mode</span>
+					<button
+						type="button"
+						onClick={() => setVoiceMode((prev) => !prev)}
+						aria-pressed={voiceMode}
+						className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${
+							voiceMode ? 'bg-emerald-500' : 'bg-slate-300'
+						}`}
+					>
+						<span
+							className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+								voiceMode ? 'translate-x-6' : 'translate-x-1'
+							}`}
+						/>
+					</button>
+				</div>
+
 				<label className="text-sm font-medium text-slate-700" htmlFor="resume-upload">
 					Upload Resume (PDF)
 				</label>
