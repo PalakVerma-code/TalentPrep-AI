@@ -1,3 +1,61 @@
+import { useState } from 'react'
+
+const MAX_TEXT_LENGTH = 160
+
+const normalizeText = (value) => {
+	if (typeof value === 'string') {
+		return value.trim()
+	}
+
+	if (Array.isArray(value)) {
+		return value
+			.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+			.filter(Boolean)
+			.join(' ')
+	}
+
+	if (value && typeof value === 'object') {
+		return Object.values(value)
+			.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+			.filter(Boolean)
+			.join(' ')
+	}
+
+	if (value === null || value === undefined) {
+		return ''
+	}
+
+	return String(value).trim()
+}
+
+function ExpandableText({ value }) {
+	const [isExpanded, setIsExpanded] = useState(false)
+	const text = normalizeText(value)
+
+	if (!text) {
+		return null
+	}
+
+	const shouldTruncate = text.length > MAX_TEXT_LENGTH
+	const shownText = shouldTruncate && !isExpanded ? `${text.slice(0, MAX_TEXT_LENGTH)}...` : text
+
+	return (
+		<div>
+			<p className="text-sm text-slate-700">{shownText}</p>
+			{shouldTruncate ? (
+				<button
+					type="button"
+					onClick={() => setIsExpanded((prev) => !prev)}
+					className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-600 underline hover:text-slate-900"
+				>
+					<span aria-hidden="true">{isExpanded ? '-' : '+'}</span>
+					{isExpanded ? 'Reduce' : 'Expand'}
+				</button>
+			) : null}
+		</div>
+	)
+}
+
 export default function EvaluationResult({ evaluation }) {
 	if (evaluation.error) {
 		return (
@@ -19,22 +77,31 @@ export default function EvaluationResult({ evaluation }) {
 
 			{evaluation.feedback && (
 				<div>
-					<p className="mb-2 text-sm font-semibold text-slate-600">Feedback</p>
-					<p className="text-sm text-slate-700">{evaluation.feedback}</p>
+					<p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+						<span aria-hidden="true">i</span>
+						Feedback
+					</p>
+					<ExpandableText value={evaluation.feedback} />
 				</div>
 			)}
 
 			{evaluation.improved_answer && (
 				<div>
-					<p className="mb-2 text-sm font-semibold text-slate-600">Improved Answer</p>
-					<p className="text-sm text-slate-700">{evaluation.improved_answer}</p>
+					<p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+						<span aria-hidden="true">*</span>
+						Improved Answer
+					</p>
+					<ExpandableText value={evaluation.improved_answer} />
 				</div>
 			)}
 
 			{evaluation.suggestions && (
 				<div>
-					<p className="mb-2 text-sm font-semibold text-slate-600">Suggestions</p>
-					<p className="text-sm text-slate-700">{evaluation.suggestions}</p>
+					<p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+						<span aria-hidden="true">{'>'}</span>
+						Suggestions
+					</p>
+					<ExpandableText value={evaluation.suggestions} />
 				</div>
 			)}
 		</div>

@@ -4,6 +4,7 @@ const express = require('express')
 const cors = require('cors')
 const { rateLimit } = require('express-rate-limit')
 const interviewRoutes = require('./routes/interview')
+const reportRoutes = require('./routes/report')
 
 const app = express()
 const PORT = 5000
@@ -33,6 +34,7 @@ app.use(
 
 			return callback(new Error('Not allowed by CORS'))
 		},
+		credentials: true,
 		methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
 		allowedHeaders: ['Content-Type', 'Authorization'],
 	})
@@ -45,6 +47,7 @@ app.get('/', (req, res) => {
 })
 
 app.use('/api/interview', interviewRoutes)
+app.use('/api/report', reportRoutes)
 
 app.use((error, req, res, next) => {
 	if (error.message === 'Not allowed by CORS') {

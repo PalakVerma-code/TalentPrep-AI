@@ -42,6 +42,22 @@ const prepareQuestions = (items) => {
 	return deduped
 }
 
+const renderList = (items, emptyText) => {
+	const values = Array.isArray(items) ? items.filter(Boolean) : []
+
+	if (values.length === 0) {
+		return <p className="text-sm text-slate-500">{emptyText}</p>
+	}
+
+	return (
+		<ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+			{values.map((item, index) => (
+				<li key={`${item}-${index}`}>{item}</li>
+			))}
+		</ul>
+	)
+}
+
 export default function Interview({ user }) {
 	const navigate = useNavigate()
 	const [questions, setQuestions] = useState([])
@@ -51,6 +67,7 @@ export default function Interview({ user }) {
 	const [resumeFile, setResumeFile] = useState(null)
 	const [isUploading, setIsUploading] = useState(false)
 	const [uploadMessage, setUploadMessage] = useState('')
+	const [latestReport, setLatestReport] = useState(null)
 	const [voiceMode, setVoiceMode] = useState(false)
 	const hasFetchedInitialQuestion = useRef(false)
 	const currentQuestion =
@@ -205,6 +222,22 @@ export default function Interview({ user }) {
 	}, [])
 
 	useEffect(() => {
+		try {
+			const savedReport = localStorage.getItem('skillGapReport')
+			if (!savedReport) {
+				return
+			}
+
+			const parsedReport = JSON.parse(savedReport)
+			if (parsedReport && typeof parsedReport === 'object') {
+				setLatestReport(parsedReport)
+			}
+		} catch (error) {
+			console.error('Failed to restore skill gap report:', error)
+		}
+	}, [])
+
+	useEffect(() => {
 		if (!voiceMode || !questions[currentIndex] || !window.speechSynthesis) {
 			return
 		}
@@ -240,6 +273,33 @@ export default function Interview({ user }) {
 			</div>
 
 			<div className="mx-auto mb-6 flex w-full max-w-7xl flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4">
+				{latestReport ? (
+					<div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+						<h3 className="mb-3 text-base font-semibold text-emerald-900">Latest Skill Gap Report</h3>
+						<div className="grid gap-3">
+							<section className="rounded-md bg-white p-3">
+								<p className="mb-1 text-sm font-semibold text-slate-700">Strengths</p>
+								{renderList(latestReport.strengths, 'No strengths identified yet.')}
+							</section>
+							<section className="rounded-md bg-white p-3">
+								<p className="mb-1 text-sm font-semibold text-slate-700">Weaknesses</p>
+								{renderList(latestReport.weaknesses, 'No weaknesses identified yet.')}
+							</section>
+							<section className="rounded-md bg-white p-3">
+								<p className="mb-1 text-sm font-semibold text-slate-700">Topics to Improve</p>
+								{renderList(latestReport.topics_to_improve, 'No topics to improve identified yet.')}
+							</section>
+							<section className="rounded-md bg-white p-3">
+								<p className="mb-1 text-sm font-semibold text-slate-700">Overall Summary</p>
+								<p className="text-sm text-slate-700">
+									{latestReport.overall_summary || latestReport.summary || 'No summary available yet.'}
+								</p>
+							</section>
+						</div>
+						<p className="mt-3 text-xs text-emerald-700">This report is synced from your Dashboard generation.</p>
+					</div>
+				) : null}
+
 				<div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
 					<span className="text-sm font-medium text-slate-700">Voice Interview Mode</span>
 					<button
