@@ -10,8 +10,7 @@ export default function AnswerInput({ answer, onAnswerChange, onSubmit, isEvalua
 
 	const startListening = () => {
 		setSpeechError('')
-
-		const SpeechRecognition =
+         const SpeechRecognition =
 			window.SpeechRecognition || window.webkitSpeechRecognition
 
 		if (!SpeechRecognition) {
