@@ -1,4 +1,4 @@
-# AI Interview Coach 🤖🎤
+# Talent PrepAi (Ai-Interview-Coach) 🤖🎤
 
 An AI-powered interview preparation platform that simulates real interview scenarios using text and voice interaction, evaluates user responses, and generates personalized feedback and skill-gap reports.
 
