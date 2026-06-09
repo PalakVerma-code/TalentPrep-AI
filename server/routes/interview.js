@@ -11,11 +11,11 @@ const {
 } = require('../controllers/aiControllers')
 
 const router = express.Router()
-const storage = multer.memoryStorage()
+const storage = multer.memoryStorage() // Use memory storage for multer since we will process the file in memory without saving to disk
 const maxResumeSizeMb = Number.parseInt(process.env.MAX_RESUME_SIZE_MB || '5', 10)
 const maxResumeSizeBytes = Math.max(1, maxResumeSizeMb) * 1024 * 1024
 
-const upload = multer({
+const upload = multer({   // Configure multer for handling resume uploads with file size limits and file type filtering
 	storage,
 	limits: { fileSize: maxResumeSizeBytes },
 	fileFilter: (req, file, callback) => {
@@ -41,7 +41,7 @@ const aiLimiter = rateLimit({
 	legacyHeaders: false,
 	message: { error: 'Too many AI requests. Please try again in a few minutes.' },
 })
-
+// Separate rate limiters for session-related routes to allow more frequent access to the dashboard while still protecting against abuse of write operations like deleting sessions
 const sessionsReadLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 120,
@@ -49,7 +49,7 @@ const sessionsReadLimiter = rateLimit({
 	legacyHeaders: false,
 	message: { error: 'Too many dashboard requests. Please slow down.' },
 })
-
+// Write operations like deleting sessions should have a stricter limit to prevent abuse
 const sessionsWriteLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 30,

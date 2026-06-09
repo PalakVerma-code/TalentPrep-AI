@@ -1,8 +1,10 @@
-const { GoogleGenAI } = require('@google/genai')
-const { PDFParse } = require('pdf-parse')
+//one job is to generate question and evaluate answer using Gemini API
+//another job is to save sessions in Supabase and retrieve them for dashboard
+const { GoogleGenAI } = require('@google/genai') // Gemini API client library
+const { PDFParse } = require('pdf-parse')  // For parsing PDF resumes
 const supabase = require('../supabaseClient')
 
-const cleanQuestionText = (text) => {
+const cleanQuestionText = (text) => {  // Remove markdown, bullets, numbering, and extra whitespace
 	return text
 		.replace(/[*_`#>-]/g, '')
 		.replace(/\s+/g, ' ')
@@ -10,7 +12,7 @@ const cleanQuestionText = (text) => {
 		.trim()
 }
 
-const normalizeScore = (rawScore) => {
+const normalizeScore = (rawScore) => {  // Convert various score formats to a number between 0 and 10
 	if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
 		return Math.max(0, Math.min(10, Math.round(rawScore)))
 	}
@@ -40,14 +42,15 @@ const getUniqueQuestions = (rawQuestions, limit = 5) => {
 		if (typeof item !== 'string') {
 			continue
 		}
-
-		const cleaned = cleanQuestionText(item)
+        // Clean the question text to ensure uniqueness is based on the actual question, not formatting
+		const cleaned = cleanQuestionText(item) 
 		if (!cleaned) {
 			continue
 		}
-
+         // Use a lowercase version of the cleaned question as the key for uniqueness
 		const key = cleaned.toLowerCase()
-		if (seen.has(key)) {
+		// If we've already seen this question, skip it
+		if (seen.has(key)) {  
 			continue
 		}
 
@@ -61,7 +64,8 @@ const getUniqueQuestions = (rawQuestions, limit = 5) => {
 
 	return unique
 }
-
+ //generate one question for fresher, without numbering or markdown, just the question sentence. no explanation.
+ //route: GET /api/interview/generate-question
 const generateQuestion = async (req, res) => {
 	try {
 		const apiKey = process.env.GEMINI_API_KEY
@@ -72,12 +76,12 @@ const generateQuestion = async (req, res) => {
 		}
 
 		console.log('Initializing Gemini AI...')
-		const genAI = new GoogleGenAI({ apiKey })
+		const genAI = new GoogleGenAI({ apiKey }) // Initialize the Gemini API client with the provided API key
 		const prompt =
 			'Generate exactly one professional HR interview question for a fresher. Return only the question sentence, without numbering, markdown, bullets, or explanation.'
 
 		console.log('Calling Gemini API for question generation...')
-		const result = await genAI.models.generateContent({
+		const result = await genAI.models.generateContent({   //request Gemini to generate content based on the prompt
 			model: 'gemini-2.5-flash',
 			contents: prompt,
 		})
@@ -86,9 +90,9 @@ const generateQuestion = async (req, res) => {
 		console.log('Result keys:', Object.keys(result || {}))
 
 		let rawText = ''
-		if (result?.text) {
+		if (result?.text) { // The most common case is that the generated text is in result.text
 			rawText = result.text
-		} else if (result?.response?.text) {
+		} else if (result?.response?.text) { // In some cases, the response might be nested under result.response.text
 			rawText = result.response.text
 		} else if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
 			rawText = result.candidates[0].content.parts[0].text
@@ -107,7 +111,7 @@ const generateQuestion = async (req, res) => {
 			return res.status(500).json({ error: 'Could not generate question. Please try again.' })
 		}
 
-		const firstLine = rawText.split('\n')[0] || ''
+		const firstLine = rawText.split('\n')[0] || '' // Take only the first line in case Gemini returns multiple lines, but still clean it up
 		const question = cleanQuestionText(firstLine)
 
 		if (!question) {
@@ -136,7 +140,7 @@ const generateQuestion = async (req, res) => {
 		return res.status(500).json({ error: 'Could not generate question. Please try again.' })
 	}
 }
-
+//route: POST /api/interview/evaluate-answer
 const evaluateAnswer = async (req, res) => {
 	try {
 		const { answer, question } = req.body
@@ -198,13 +202,13 @@ Give response in JSON format with:
 		}
 
 		try {
-			const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+			const jsonMatch = responseText.match(/\{[\s\S]*\}/) // Extract the JSON object from the response
 			if (!jsonMatch) {
 				console.error('No JSON found in response')
 				return res.status(500).json({ error: 'Could not evaluate answer. Please try again.' })
 			}
 
-			const evaluation = JSON.parse(jsonMatch[0])
+			const evaluation = JSON.parse(jsonMatch[0]) // Parse the JSON to get the evaluation details
 			const score = normalizeScore(evaluation.score)
 			console.log('Parsed evaluation successfully')
 
@@ -215,7 +219,7 @@ Give response in JSON format with:
 					question: question || null,
 					answer: answer,
 					score: score,
-					feedback: evaluation.feedback || null,
+					feedback: evaluation.feedback || null, 
 					improved_answer: evaluation.improved_answer || null,
 				},
 			])
@@ -255,7 +259,7 @@ Give response in JSON format with:
 		return res.status(500).json({ error: 'Could not evaluate answer. Please try again.' })
 	}
 }
-
+//route: POST /api/interview/upload-resume
 const handleResumeUpload = async (req, res) => {
 	let mode = 'general'
 	let resumeTextForSave = null
@@ -283,10 +287,10 @@ Return JSON array only.`
 				return res.status(400).json({ error: 'Invalid resume file' })
 			}
 
-			const parser = new PDFParse({ data: req.file.buffer })
-			const parsedPdf = await parser.getText()
-			await parser.destroy()
-			const resumeText = (parsedPdf.text || '').trim().slice(0, 2000)
+			const parser = new PDFParse({ data: req.file.buffer }) // Parse the uploaded PDF resume to extract text content
+			const parsedPdf = await parser.getText()   // Extract text from the PDF buffer using pdf-parse library
+			await parser.destroy() // Clean up any resources used by the parser
+			const resumeText = (parsedPdf.text || '').trim().slice(0, 2000) // Take only the first 2000 characters of the resume text to avoid hitting token limits, and trim whitespace
 
 			if (!resumeText) {
 				return res.status(400).json({ error: 'Could not extract text from resume' })
@@ -322,7 +326,7 @@ ${resumeText}`
 			return res.status(500).json({ error: 'Empty response from AI' })
 		}
 
-		const jsonArrayMatch = responseText.match(/\[[\s\S]*\]/)
+		const jsonArrayMatch = responseText.match(/\[[\s\S]*\]/) // Extract the JSON array from the response, which should contain the questions
 		if (!jsonArrayMatch) {
 			return res.status(500).json({ error: 'Invalid AI response format' })
 		}
@@ -334,7 +338,7 @@ ${resumeText}`
 			return res.status(500).json({ error: 'Invalid AI response format' })
 		}
 
-		const { error: saveError } = await supabase.from('interview_sessions').insert([
+		const { error: saveError } = await supabase.from('interview_sessions').insert([ // Save the generated questions and resume text (if any) to Supabase for later retrieval in the dashboard
 			{
 				user_id: userId,
 				question: typeof questions[0] === 'string' ? questions[0] : null,
@@ -384,15 +388,15 @@ ${resumeText}`
 		return res.status(500).json({ error: 'Could not process resume upload' })
 	}
 }
-
+//route: GET /api/interview/sessions
 const getSessions = async (req, res) => {
 	try {
 		const userId = req.user?.id
 		if (!userId) {
 			return res.status(401).json({ error: 'Unauthorized' })
 		}
-
-		const { data, error } = await supabase
+        // Fetch all interview sessions for the authenticated user from Supabase, ordered by creation date (most recent first)
+		const { data, error } = await supabase  
 			.from('interview_sessions')
 			.select('*')
 			.eq('user_id', userId)
@@ -410,8 +414,10 @@ const getSessions = async (req, res) => {
 	}
 }
 
+// For backward compatibility, we can export getSessions under another name as well
 const getInterviewSessions = getSessions
 
+//route: DELETE /api/interview/sessions/:id
 const deleteSession = async (req, res) => {
 	try {
 		const { id } = req.params

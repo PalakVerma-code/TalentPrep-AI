@@ -13,11 +13,11 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:51
 	.map((origin) => origin.trim())
 	.filter(Boolean)
 
-const globalLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	max: 300,
-	standardHeaders: true,
-	legacyHeaders: false,
+const globalLimiter = rateLimit({ // main goal is to prevent abuse of the server, not to limit normal usage
+	windowMs: 15 * 60 * 1000,// 15 minutes
+	max: 300,               // limit each IP to 300 requests per windowMs
+	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false,   // Disable the `X-RateLimit-*` headers
 	message: { error: 'Too many requests. Please try again shortly.' },
 })
 
