@@ -75,12 +75,11 @@ const generateQuestion = async (req, res) => {
 			return res.status(500).json({ error: 'API key not configured' })
 		}
 
-		console.log('Initializing Gemini AI...')
 		const genAI = new GoogleGenAI({ apiKey }) // Initialize the Gemini API client with the provided API key
 		const prompt =
 			'Generate exactly one professional HR interview question for a fresher. Return only the question sentence, without numbering, markdown, bullets, or explanation.'
 
-		console.log('Calling Gemini API for question generation...')
+		
 		const result = await genAI.models.generateContent({   //request Gemini to generate content based on the prompt
 			model: 'gemini-2.5-flash',
 			contents: prompt,
@@ -99,12 +98,12 @@ const generateQuestion = async (req, res) => {
 		} else if (typeof result === 'string') {
 			rawText = result
 		} else {
-			console.error('Unknown result format:', JSON.stringify(result).substring(0, 200))
+			
 			return res.status(500).json({ error: 'Unexpected API response format' })
 		}
 
 		rawText = rawText.trim()
-		console.log('Gemini raw response:', rawText.substring(0, 100))
+		
 
 		if (!rawText) {
 			console.error('Empty response from Gemini')
@@ -115,11 +114,11 @@ const generateQuestion = async (req, res) => {
 		const question = cleanQuestionText(firstLine)
 
 		if (!question) {
-			console.error('Question is empty after cleanup:', firstLine)
+		
 			return res.status(500).json({ error: 'Could not generate question. Please try again.' })
 		}
 
-		console.log('Generated question:', question)
+		
 		return res.json({ question })
 	} catch (error) {
 		const errorMessage = error.message || ''
@@ -194,7 +193,7 @@ Give response in JSON format with:
 		}
 
 		responseText = responseText.trim()
-		console.log('Gemini evaluation response (first 200 chars):', responseText.substring(0, 200))
+		
 
 		if (!responseText) {
 			console.error('Empty response from Gemini for evaluation')
@@ -231,13 +230,12 @@ Give response in JSON format with:
 					details: error.message,
 				})
 			} else {
-				console.log('Session saved to Supabase successfully')
+				console.log('Evaluation saved to database successfully')
 			}
 
 			return res.json({ ...evaluation, score })
 		} catch (parseError) {
-			console.error('JSON parse error:', parseError.message)
-			console.error('Raw response was:', responseText)
+			
 			return res.status(500).json({ error: 'Could not evaluate answer. Please try again.' })
 		}
 	} catch (error) {
@@ -348,7 +346,7 @@ ${resumeText}`
 		])
 
 		if (saveError) {
-			console.error('Error saving session:', saveError.message)
+			
 			return res.status(500).json({
 				error: 'Questions generated, but failed to save session.',
 				details: saveError.message,

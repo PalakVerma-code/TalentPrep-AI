@@ -1,6 +1,7 @@
+//one job is  to generate a skill gap report based on the interview sessions of the user. The report will analyze the user's performance in their mock interviews and identify areas of strength, weakness, and specific topics they can improve on to enhance their chances of success in real interviews. The report will be generated using Gemini's language model, which will analyze the content of the user's interview sessions and provide insights based on that data.
 const { GoogleGenAI } = require('@google/genai')
 const supabase = require('../supabaseClient')
-
+// Helper function to safely extract an array of strings from the parsed JSON, ensuring we return an empty array if the value is missing or not in the expected format
 const safeArray = (value) => {
 	if (!Array.isArray(value)) {
 		return []
@@ -11,7 +12,7 @@ const safeArray = (value) => {
 		.map((item) => item.trim())
 		.filter(Boolean)
 }
-
+// Helper function to extract the main text content from the Gemini response, accounting for different possible response structures
 const getModelText = (result) => {
 	if (result?.text) {
 		return result.text
@@ -31,7 +32,7 @@ const getModelText = (result) => {
 
 	return ''
 }
-
+// Helper function to strip code fences from the model's response, which can help in cases where the model returns JSON wrapped in markdown-style code blocks
 const stripCodeFence = (text) => {
 	if (!text || typeof text !== 'string') {
 		return ''
@@ -44,7 +45,7 @@ const stripCodeFence = (text) => {
 		.replace(/```\s*$/i, '')
 		.trim()
 }
-
+// Helper function to robustly parse JSON from the model's response, with fallback logic to extract JSON even if it's not perfectly formatted
 const parseReportJson = (rawText) => {
 	if (!rawText || typeof rawText !== 'string') {
 		return null
@@ -67,7 +68,7 @@ const parseReportJson = (rawText) => {
 		}
 	}
 }
-
+// Fallback report generation logic in case the AI response is not usable, to ensure we can still provide some insights to the user based on their interview session data
 const buildFallbackReport = (sessions) => {
 	const scored = sessions
 		.map((item) => Number(item.score))
@@ -121,9 +122,10 @@ const buildFallbackReport = (sessions) => {
 		overall_summary: summary,
 	}
 }
-
+// Main controller function to generate the skill gap report by fetching the user's interview sessions, preparing the data, and interacting with the Gemini API to get insights, with robust error handling and fallback logic
+//route: GET /api/report
 const generateSkillGapReport = async (req, res) => {
-	let validSessionsForFallback = []
+	let validSessionsForFallback = []  
 
 	try {
 		const userId = req.user?.id
@@ -134,7 +136,7 @@ const generateSkillGapReport = async (req, res) => {
 		const { data: sessions, error: sessionsError } = await supabase
 			.from('interview_sessions')
 			.select('question, answer, score')
-			.eq('user_id', userId)
+			.eq('user_id', userId) 
 
 		if (sessionsError) {
 			console.error('Error fetching sessions for report:', sessionsError.message)
@@ -151,8 +153,8 @@ const generateSkillGapReport = async (req, res) => {
 			return res.status(404).json({ error: 'No interview sessions found for report.' })
 		}
 
-		const transcriptText = validSessions
-			.slice(0, 40)
+		const transcriptText = validSessions 
+			.slice(0, 40)// limit to 40 sessions to keep the prompt size manageable, prioritizing the most recent sessions
 			.map((session, index) => {
 				const scoreValue = Number.isFinite(Number(session.score))
 					? Number(session.score)

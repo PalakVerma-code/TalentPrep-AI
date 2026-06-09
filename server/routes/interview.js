@@ -66,7 +66,7 @@ router.get('/sessions', sessionsReadLimiter, getSessions)
 router.get('/get-sessions', sessionsReadLimiter, getSessions)
 router.delete('/sessions/:id', sessionsWriteLimiter, deleteSession)
 router.post('/upload-resume', aiLimiter, upload.single('resume'), handleResumeUpload)
-
+ // Error handling middleware specific to this router to catch multer errors and other validation errors related to resume uploads, and return appropriate error messages to the client
 router.use((error, req, res, next) => {
 	if (error instanceof multer.MulterError) {
 		if (error.code === 'LIMIT_FILE_SIZE') {

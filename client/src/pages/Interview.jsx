@@ -119,7 +119,7 @@ export default function Interview({ user }) {
 			return
 		}
 
-		console.log('Submitted answer:', answer)
+		
 		await evaluateAnswer(answer, questions[currentIndex])
 		setAnswer('')
 
