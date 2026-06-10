@@ -7,8 +7,9 @@ const interviewRoutes = require('./routes/interview')
 const reportRoutes = require('./routes/report')
 
 const app = express()
-const PORT = 5000
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173')
+const PORT = process.env.PORT || 3000
+const isProduction = process.env.NODE_ENV === 'production'
+const allowedOrigins = (isProduction ? process.env.CORS_ALLOWED_ORIGINS : 'http://localhost:5173')
 	.split(',')
 	.map((origin) => origin.trim())
 	.filter(Boolean)
@@ -56,6 +57,7 @@ app.use((error, req, res, next) => {
 
 	return next(error)
 })
+
 
 app.listen(PORT, () => {
 	console.log(`Server started on port ${PORT}`)
